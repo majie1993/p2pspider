@@ -18,6 +18,8 @@ import (
 	"github.com/fanpei91/bencode"
 	"github.com/fanpei91/godht"
 	"github.com/fanpei91/metawire"
+
+	"gopkg.in/mgo.v2"
 )
 
 const (
@@ -97,6 +99,23 @@ func newTorrent(meta []byte, infohashHex string) (*torrent, error) {
 		t.length = total
 	}
 	return t, nil
+}
+
+func saveToMongoDB(torrent torrent, err error) {
+	session, err := mgo.Dial("127.0.0.1:27017")
+	if err != nil {
+		panic(err)
+	}
+	defer session.Close()
+
+	// Optional. Switch the session to a monotonic behavior.
+	session.SetMode(mgo.Monotonic, true)
+
+	c := session.DB("p2pspider").C("torrent")
+	err = c.Insert(torrent)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type blacklist struct {
@@ -196,6 +215,7 @@ func (p *p2pspider) work(ac *godht.Announce, tokens chan struct{}) {
 	if err != nil {
 		return
 	}
+	saveToMongoDB(*t, err)
 	log.Println(t)
 }
 
